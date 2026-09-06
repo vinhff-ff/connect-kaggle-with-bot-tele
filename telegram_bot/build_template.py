@@ -22,6 +22,8 @@ os.system('pip install -q --no-input edge-tts playwright huggingface-hub ddgs ff
 os.system('python -m playwright install chromium')
 os.system('apt-get update -qq && apt-get install -y -qq libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxcb1 libxext6 libasound2 libnss3 libnspr4 libatspi2.0-0 libcairo2 libpango-1.0-0 libx11-xcb1 > /dev/null')
 os.system('pip install -q --no-input --force-reinstall --no-cache-dir llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124')
+# vieneu/transformers/scipy mới đòi numpy>=2.2 — Kaggle mặc định numpy cũ thiếu `_center` → upgrade
+os.system('pip install -q --upgrade --no-cache-dir "numpy>=2.2" scipy')
 print('SETUP DONE')
 '''
 
