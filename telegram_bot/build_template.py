@@ -32,6 +32,7 @@ import httpx
 BASE  = "@@JOB_BASE_URL@@"
 RUN_ID = "@@RUN_ID@@"
 TOKEN = {"token": "@@JOB_TOKEN@@"}
+ASSETS = ["background.jpg", "character.png", "character_confused.png", "character_cart.png"]
 
 os.chdir('/kaggle/working/pipeline')
 assets_dir = 'assets'
@@ -44,10 +45,10 @@ print('meta:', meta)
 open(f'{assets_dir}/A.jpg', 'wb').write(cli.get(f'{BASE}/jobs/{RUN_ID}/image_a.jpg', params=TOKEN).content)
 open(f'{assets_dir}/B.jpg', 'wb').write(cli.get(f'{BASE}/jobs/{RUN_ID}/image_b.jpg', params=TOKEN).content)
 
-import shutil
-SRC = '/kaggle/input/@@ASSET_DATASET@@'
-for name in ['background.jpg', 'character.png', 'character_confused.png', 'character_cart.png']:
-    shutil.copy(os.path.join(SRC, name), os.path.join(assets_dir, name))
+# Asset tĩnh (background + 3 nhân vật) được phục vụ ngay từ VPS qua job_server.
+for name in ASSETS:
+    open(os.path.join(assets_dir, name), 'wb').write(
+        cli.get(f'{BASE}/assets/{name}', params=TOKEN).content)
 print('ASSETS OK:', sorted(os.listdir(assets_dir)))
 '''
 

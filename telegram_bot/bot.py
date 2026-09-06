@@ -27,7 +27,6 @@ from aiogram.types import (
 
 from telegram_bot import kaggle_client
 from telegram_bot.config import (
-    ASSET_DATASET,
     BOT_TOKEN,
     DRY_RUN,
     JOB_SERVER_PUBLIC_URL,
@@ -199,7 +198,6 @@ def _build_notebook(job_id: str) -> dict:
         "@@JOB_BASE_URL@@": JOB_SERVER_PUBLIC_URL,
         "@@RUN_ID@@": job_id,
         "@@JOB_TOKEN@@": JOB_TOKEN,
-        "@@ASSET_DATASET@@": ASSET_DATASET,
     }
     for cell in nb["cells"]:
         if cell["cell_type"] != "code":

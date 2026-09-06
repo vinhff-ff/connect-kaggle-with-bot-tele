@@ -25,13 +25,13 @@ KAGGLE_SLUG = _required("KAGGLE_KERNEL_SLUG").strip().lower()
 JOB_SERVER_PUBLIC_URL = os.getenv("JOB_SERVER_PUBLIC_URL", "http://127.0.0.1:8787").rstrip("/")
 JOB_SERVER_PORT = int(os.getenv("JOB_SERVER_PORT", "8787"))
 JOB_TOKEN = os.getenv("JOB_TOKEN", "")
-ASSET_DATASET = os.getenv("ASSET_DATASET", "")
 REPO_URL = os.getenv("REPO_URL", "https://github.com/vinhff-ff/ai-video-comparison-tool.git")
 DEFAULT_VOICE = os.getenv("DEFAULT_VOICE", "Adam")
 DRY_RUN = os.getenv("DRY_RUN", "0") == "1"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 JOBS_DIR = BASE_DIR / "telegram_bot" / "jobs"
+ASSETS_DIR = BASE_DIR / "telegram_bot" / "assets"
 
 # Giọng cho user chọn (engine vieneu — subset phổ biến)
 VOICE_OPTIONS = [
