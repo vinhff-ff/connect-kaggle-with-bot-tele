@@ -18,12 +18,18 @@ if not os.path.exists('pipeline/.git'):
 os.chdir('pipeline')
 print("cwd:", os.getcwd())
 
+# Pin numpy TRƯỚC khi cài vieneu/transformers.
+# scipy (mà vieneu/transformers kéo theo) vẫn gọi numpy._core._multiarray_umath._blas_supports_fpe,
+# nhưng numpy>=2.4 đã bỏ hàm này → ràng buộc numpy xuống 2.3.x để pip không tự nâng lên 2.4.
+os.system('pip install -q --no-cache-dir "numpy>=2.2,<2.4"')
+
 os.system('pip install -q --no-input edge-tts playwright huggingface-hub ddgs ffmpeg-python vieneu')
 os.system('python -m playwright install chromium')
 os.system('apt-get update -qq && apt-get install -y -qq libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxcb1 libxext6 libasound2 libnss3 libnspr4 libatspi2.0-0 libcairo2 libpango-1.0-0 libx11-xcb1 > /dev/null')
 os.system('pip install -q --no-input --force-reinstall --no-cache-dir llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124')
-# vieneu/transformers/scipy mới đòi numpy>=2.2 — Kaggle mặc định numpy cũ thiếu `_center` → upgrade
-os.system('pip install -q --upgrade --no-cache-dir "numpy>=2.2" scipy')
+
+import numpy
+print('numpy', numpy.__version__)
 print('SETUP DONE')
 '''
 
@@ -55,6 +61,22 @@ print('ASSETS OK:', sorted(os.listdir(assets_dir)))
 '''
 
 RUN = r'''
+# ==== Check sớm xung đột numpy/scipy ====
+import numpy as np
+import numpy._core._multiarray_umath as _mumath
+if not hasattr(_mumath, '_blas_supports_fpe'):
+    # scipy < 1.18 gọi _blas_supports_fpe lúc import; numpy>=2.4 đã bỏ.
+    # Khat giúp pipeline chạy tiếp + cảnh báo để biết nguyên nhân.
+    _mumath._blas_supports_fpe = lambda x: False
+    print('[WARN] numpy thiếu _blas_supports_fpe — đã inject shim (scipy<1.18 + numpy>=2.4)')
+try:
+    import scipy
+    import transformers
+except Exception as e:
+    raise SystemExit(f'ENV INCOMPATIBLE: {type(e).__name__}: {e}. '
+                     'Chạy lại cell SETUP (pip install "numpy>=2.2,<2.4") rồi RESTART kernel.') from e
+print('numpy', np.__version__, '| scipy', scipy.__version__, '| transformers', transformers.__version__)
+
 import sys
 sys.path.insert(0, 'src')
 from pipeline import generate_video_phase3
