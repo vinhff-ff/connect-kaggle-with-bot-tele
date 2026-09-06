@@ -25,7 +25,7 @@ async def push_notebook(notebook: dict) -> None:
     """Tạo/mở notebook trên Kaggle (bật GPU + internet) => bắt đầu chạy."""
     payload = {
         "newTitle": "AI-Video-Job",
-        "slug": KAGGLE_SLUG,
+        "slug": f"{KAGGLE_OWNER}/{KAGGLE_SLUG}",
         "oldTitle": None,
         "language": "python",
         "kernelType": "notebook",
@@ -38,18 +38,28 @@ async def push_notebook(notebook: dict) -> None:
     }
     async with httpx.AsyncClient(auth=_auth(), timeout=60) as client:
         r = await client.post(f"{KAGGLE_API}/kernels/push", json=payload)
+        body = r.json()
         if r.status_code >= 400:
-            raise RuntimeError(f"Kaggle push thất bại ({r.status_code}): {r.text}")
+            raise RuntimeError(
+                f"Kaggle push thất bại ({r.status_code}): "
+                f"{body.get('message') or r.text}"
+            )
+        # API mới trả HTTP 200 kèm error (vd invalid slug/trùng title).
+        if body.get("error"):
+            raise RuntimeError(f"Kaggle push từ chối: {body['error']}")
 
 
 async def get_status() -> str:
     async with httpx.AsyncClient(auth=_auth(), timeout=30) as client:
         r = await client.get(
             f"{KAGGLE_API}/kernels/status",
-            params={"user": KAGGLE_OWNER, "kernel": KAGGLE_SLUG},
+            params={"userName": KAGGLE_OWNER, "kernelSlug": KAGGLE_SLUG},
         )
-        r.raise_for_status()
-        return r.json().get("status", "unknown")
+    if r.status_code == 404:
+        # Chưa có run nào (hoặc push chưa kịp đăng ký) → chờ tiếp.
+        return "no_run"
+    r.raise_for_status()
+    return r.json().get("status", "unknown")
 
 
 async def download_output(dest: Path) -> Path:
@@ -58,7 +68,7 @@ async def download_output(dest: Path) -> Path:
     async with httpx.AsyncClient(auth=_auth(), timeout=300) as client:
         r = await client.get(
             f"{KAGGLE_API}/kernels/output",
-            params={"user": KAGGLE_OWNER, "kernel": KAGGLE_SLUG},
+            params={"userName": KAGGLE_OWNER, "kernelSlug": KAGGLE_SLUG},
         )
         r.raise_for_status()
     zip_path.write_bytes(r.content)

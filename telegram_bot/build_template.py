@@ -13,15 +13,15 @@ SETUP = r'''
 import os, glob, json
 os.chdir('/kaggle/working')
 REPO_URL = "@@REPO_URL@@"
-if not os.path.exists('ai-video-comparison-tool/.git'):
-    os.system(f'git clone {REPO_URL}')
-os.chdir('ai-video-comparison-tool')
+if not os.path.exists('pipeline/.git'):
+    os.system(f'git clone {REPO_URL} pipeline')
+os.chdir('pipeline')
 print("cwd:", os.getcwd())
 
 os.system('pip install -q --no-input edge-tts playwright huggingface-hub ddgs ffmpeg-python vieneu')
 os.system('python -m playwright install chromium')
 os.system('apt-get update -qq && apt-get install -y -qq libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxcb1 libxext6 libasound2 libnss3 libnspr4 libatspi2.0-0 libcairo2 libpango-1.0-0 libx11-xcb1 > /dev/null')
-os.system('pip install -q --no-input llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124')
+os.system('pip install -q --no-input --force-reinstall --no-cache-dir llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124')
 print('SETUP DONE')
 '''
 
@@ -33,7 +33,7 @@ BASE  = "@@JOB_BASE_URL@@"
 RUN_ID = "@@RUN_ID@@"
 TOKEN = {"token": "@@JOB_TOKEN@@"}
 
-os.chdir('/kaggle/working/ai-video-comparison-tool')
+os.chdir('/kaggle/working/pipeline')
 assets_dir = 'assets'
 os.makedirs(assets_dir, exist_ok=True)
 

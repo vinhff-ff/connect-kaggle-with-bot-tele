@@ -4,7 +4,9 @@ from pathlib import Path
 
 from dotenv import load_dotenv
 
-load_dotenv()
+BASE_DIR = Path(__file__).resolve().parent.parent
+load_dotenv(Path(__file__).resolve().parent / ".env")
+load_dotenv(BASE_DIR / ".env")
 
 
 def _required(name: str) -> str:
@@ -30,7 +32,6 @@ DRY_RUN = os.getenv("DRY_RUN", "0") == "1"
 
 BASE_DIR = Path(__file__).resolve().parent.parent
 JOBS_DIR = BASE_DIR / "telegram_bot" / "jobs"
-JOBS_DIR.mkdir(parents=True, exist_ok=True)
 
 # Giọng cho user chọn (engine vieneu — subset phổ biến)
 VOICE_OPTIONS = [
