@@ -34,7 +34,7 @@ async def push_notebook(notebook: dict) -> None:
         "enableInternet": True,
         "datasetDataSources": [],
         "competitionDataSources": [],
-        "code": json.dumps(notebook),
+        "text": json.dumps(notebook),
     }
     async with httpx.AsyncClient(auth=_auth(), timeout=60) as client:
         r = await client.post(f"{KAGGLE_API}/kernels/push", json=payload)
