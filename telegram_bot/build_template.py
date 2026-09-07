@@ -18,18 +18,66 @@ if not os.path.exists('pipeline/.git'):
 os.chdir('pipeline')
 print("cwd:", os.getcwd())
 
-# Pin numpy TRƯỚC khi cài vieneu/transformers.
-# scipy (mà vieneu/transformers kéo theo) vẫn gọi numpy._core._multiarray_umath._blas_supports_fpe,
-# nhưng numpy>=2.4 đã bỏ hàm này → ràng buộc numpy xuống 2.3.x để pip không tự nâng lên 2.4.
-os.system('pip install -q --no-cache-dir "numpy>=2.2,<2.4"')
+import numpy as _np_live
+print('numpy LIVE trong kernel chính (dùng cho pipeline/LLM/ffmpeg):', _np_live.__version__)
 
-os.system('pip install -q --no-input edge-tts playwright huggingface-hub ddgs ffmpeg-python vieneu')
+TTS_VENV = '/kaggle/working/tts_env'
+MARKER = f'{TTS_VENV}/.setup_ok'
+
+if os.path.exists(TTS_VENV) and not os.path.exists(MARKER):
+    import shutil
+    print('tts_env dở dang từ lần trước, xóa và tạo lại...')
+    shutil.rmtree(TTS_VENV)
+
+if not os.path.exists(TTS_VENV):
+    ret = os.system(f'python3 -m venv --without-pip {TTS_VENV}')
+    if ret != 0:
+        raise SystemExit('Tạo venv tts_env THẤT BẠI.')
+
+    ret = os.system('curl -sS https://bootstrap.pypa.io/get-pip.py -o /tmp/get-pip.py')
+    if ret != 0:
+        raise SystemExit('Tải get-pip.py THẤT BẠI (kiểm tra mạng/DNS).')
+
+    ret = os.system(f'{TTS_VENV}/bin/python3 /tmp/get-pip.py --no-warn-script-location')
+    if ret != 0:
+        raise SystemExit('Cài pip vào tts_env bằng get-pip.py THẤT BẠI.')
+
+    PIP = f'{TTS_VENV}/bin/pip'
+
+    ret = os.system(f'{PIP} install -q "torch==2.5.1" --index-url https://download.pytorch.org/whl/cu121')
+    if ret != 0:
+        raise SystemExit('Cài torch cho tts_env THẤT BẠI.')
+
+    ret = os.system(f'{PIP} install -q --no-deps vieneu')
+    if ret != 0:
+        raise SystemExit('Cài vieneu (--no-deps) cho tts_env THẤT BẠI.')
+
+    ret = os.system(
+        f'{PIP} install -q "numpy<2.3" scipy transformers safetensors '
+        f'gradio huggingface_hub kaldi-native-fbank librosa onnxruntime '
+        f'PyYAML sea-g2p soundfile soxr tokenizers'
+    )
+    if ret != 0:
+        raise SystemExit('Cài dependency còn lại cho tts_env THẤT BẠI.')
+
+    open(MARKER, 'w').close()
+    print('tts_env cài đặt xong, đã đánh dấu marker.')
+else:
+    print('tts_env đã cài đặt sẵn (marker OK), bỏ qua bước cài.')
+
+check = os.popen(
+    f'{TTS_VENV}/bin/python -c "import torch; print(torch.__version__, torch.cuda.get_device_capability(0) if torch.cuda.is_available() else \'NO GPU\')"'
+).read()
+print('tts_env torch check:', check.strip())
+
+ret = os.system('pip install -q --no-input edge-tts playwright huggingface-hub ddgs ffmpeg-python')
+if ret != 0:
+    raise SystemExit('pip install pipeline deps THẤT BẠI.')
+
 os.system('python -m playwright install chromium')
 os.system('apt-get update -qq && apt-get install -y -qq libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libxcb1 libxext6 libasound2 libnss3 libnspr4 libatspi2.0-0 libcairo2 libpango-1.0-0 libx11-xcb1 > /dev/null')
 os.system('pip install -q --no-input --force-reinstall --no-cache-dir llama-cpp-python --extra-index-url https://abetlen.github.io/llama-cpp-python/whl/cu124')
 
-import numpy
-print('numpy', numpy.__version__)
 print('SETUP DONE')
 '''
 
@@ -61,22 +109,6 @@ print('ASSETS OK:', sorted(os.listdir(assets_dir)))
 '''
 
 RUN = r'''
-# ==== Check sớm xung đột numpy/scipy ====
-import numpy as np
-import numpy._core._multiarray_umath as _mumath
-if not hasattr(_mumath, '_blas_supports_fpe'):
-    # scipy < 1.18 gọi _blas_supports_fpe lúc import; numpy>=2.4 đã bỏ.
-    # Khat giúp pipeline chạy tiếp + cảnh báo để biết nguyên nhân.
-    _mumath._blas_supports_fpe = lambda x: False
-    print('[WARN] numpy thiếu _blas_supports_fpe — đã inject shim (scipy<1.18 + numpy>=2.4)')
-try:
-    import scipy
-    import transformers
-except Exception as e:
-    raise SystemExit(f'ENV INCOMPATIBLE: {type(e).__name__}: {e}. '
-                     'Chạy lại cell SETUP (pip install "numpy>=2.2,<2.4") rồi RESTART kernel.') from e
-print('numpy', np.__version__, '| scipy', scipy.__version__, '| transformers', transformers.__version__)
-
 import sys
 sys.path.insert(0, 'src')
 from pipeline import generate_video_phase3
@@ -98,6 +130,7 @@ result = await generate_video_phase3(
     intro_a=meta['intro_a'],
     intro_b=meta['intro_b'],
     note=meta.get('note', ''),
+    product_name=meta.get('product_name', ''),
     assets=assets,
     run_id=meta['run_id'],
     engine='vieneu',

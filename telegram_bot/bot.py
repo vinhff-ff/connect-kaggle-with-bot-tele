@@ -50,6 +50,7 @@ class Job(StatesGroup):
     intro_a = State()
     intro_b = State()
     note = State()
+    product_name = State()
     voice = State()
 
 
@@ -140,8 +141,19 @@ async def on_intro_b(message: Message, state: FSMContext):
 async def on_note(message: Message, state: FSMContext):
     note = "" if message.text.strip() == "-" else message.text.strip()
     await state.update_data(note=note)
+    await state.set_state(Job.product_name)
+    await message.answer(
+        "✅ Chú ý xong. Nhập <b>tên sản phẩm</b> bạn muốn giới thiệu ở cuối video "
+        "(sách, khoá học, app... hoặc gõ <code>-</code> nếu không cần)."
+    )
+
+
+@router.message(Job.product_name)
+async def on_product_name(message: Message, state: FSMContext):
+    product_name = "" if message.text.strip() == "-" else message.text.strip()
+    await state.update_data(product_name=product_name)
     await state.set_state(Job.voice)
-    await message.answer("✅ Chú ý xong. 8️⃣ Chọn <b>giọng đọc</b> (VieNeu-TTS):",
+    await message.answer("✅ Tên sản phẩm xong. 8️⃣ Chọn <b>giọng đọc</b> (VieNeu-TTS):",
                          reply_markup=_kb_voices())
 
 
@@ -170,6 +182,7 @@ async def _launch_job(message: Message, data: dict, voice: str) -> str:
         "name_a": data["name_a"], "name_b": data["name_b"],
         "intro_a": data["intro_a"], "intro_b": data["intro_b"],
         "note": data.get("note", ""),
+        "product_name": data.get("product_name", ""),
         "voice": voice,
     }
     (job_dir / "metadata.json").write_text(

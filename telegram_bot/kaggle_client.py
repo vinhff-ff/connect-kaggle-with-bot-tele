@@ -24,7 +24,7 @@ def _auth() -> httpx.BasicAuth:
 async def push_notebook(notebook: dict) -> None:
     """Tạo/mở notebook trên Kaggle (bật GPU + internet) => bắt đầu chạy."""
     payload = {
-        "newTitle": "AI-Video-Job",
+        "newTitle": KAGGLE_SLUG,          # dùng slug làm title luôn — luôn duy nhất, không đụng độ
         "slug": f"{KAGGLE_OWNER}/{KAGGLE_SLUG}",
         "oldTitle": None,
         "language": "python",
@@ -44,7 +44,6 @@ async def push_notebook(notebook: dict) -> None:
                 f"Kaggle push thất bại ({r.status_code}): "
                 f"{body.get('message') or r.text}"
             )
-        # API mới trả HTTP 200 kèm error (vd invalid slug/trùng title).
         if body.get("error"):
             raise RuntimeError(f"Kaggle push từ chối: {body['error']}")
 
@@ -75,8 +74,15 @@ async def download_output(dest: Path) -> Path:
     import zipfile
 
     extract_dir = dest / "out"
-    with zipfile.ZipFile(zip_path) as zf:
-        zf.extractall(extract_dir)
+    try:
+        with zipfile.ZipFile(zip_path) as zf:
+            zf.extractall(extract_dir)
+    except zipfile.BadZipFile:
+        preview = r.content[:500]
+        raise RuntimeError(
+            f"Kaggle không trả zip hợp lệ (size={len(r.content)} bytes). "
+            f"Nội dung nhận: {preview!r}"
+        )
     return extract_dir
 
 
