@@ -1,8 +1,9 @@
 """kaggle_client.py — điều khiển Kaggle qua HTTP API (không cần CLI).
 
 Chịu trách nhiệm: push notebook (=> Kaggle tự chạy), poll trạng thái, tải
-output zip về. Xác thực bằng HTTP Basic với Kaggle username + API key.
+output về. Xác thực bằng HTTP Basic với Kaggle username + API key.
 """
+import asyncio
 import base64
 import json
 import time
@@ -24,7 +25,7 @@ def _auth() -> httpx.BasicAuth:
 async def push_notebook(notebook: dict) -> None:
     """Tạo/mở notebook trên Kaggle (bật GPU + internet) => bắt đầu chạy."""
     payload = {
-        "newTitle": KAGGLE_SLUG,          # dùng slug làm title luôn — luôn duy nhất, không đụng độ
+        "newTitle": KAGGLE_SLUG,
         "slug": f"{KAGGLE_OWNER}/{KAGGLE_SLUG}",
         "oldTitle": None,
         "language": "python",
@@ -55,35 +56,57 @@ async def get_status() -> str:
             params={"userName": KAGGLE_OWNER, "kernelSlug": KAGGLE_SLUG},
         )
     if r.status_code == 404:
-        # Chưa có run nào (hoặc push chưa kịp đăng ký) → chờ tiếp.
         return "no_run"
     r.raise_for_status()
     return r.json().get("status", "unknown")
 
 
-async def download_output(dest: Path) -> Path:
-    """Tải output zip của kernel về dest rồi giải nén. Trả về thư mục đã giải nén."""
-    zip_path = dest / f"{KAGGLE_SLUG}.zip"
-    async with httpx.AsyncClient(auth=_auth(), timeout=300) as client:
-        r = await client.get(
-            f"{KAGGLE_API}/kernels/output",
-            params={"userName": KAGGLE_OWNER, "kernelSlug": KAGGLE_SLUG},
-        )
-        r.raise_for_status()
-    zip_path.write_bytes(r.content)
-    import zipfile
+async def download_output(dest: Path, retries: int = 5, retry_delay: int = 15) -> Path:
+    """Tải output của kernel về dest.
 
+    Kaggle API /kernels/output trả 1 JSON có field "files", mỗi phần tử gồm
+    {"fileName": "...", "url": "https://..."}. Tìm file "*_final.mp4", rồi GET
+    thẳng vào "url" (đã ký sẵn token) để tải nội dung file thật.
+    """
     extract_dir = dest / "out"
-    try:
-        with zipfile.ZipFile(zip_path) as zf:
-            zf.extractall(extract_dir)
-    except zipfile.BadZipFile:
-        preview = r.content[:500]
-        raise RuntimeError(
-            f"Kaggle không trả zip hợp lệ (size={len(r.content)} bytes). "
-            f"Nội dung nhận: {preview!r}"
+    extract_dir.mkdir(parents=True, exist_ok=True)
+    last_error = None
+
+    for attempt in range(1, retries + 1):
+        async with httpx.AsyncClient(auth=_auth(), timeout=300) as client:
+            r = await client.get(
+                f"{KAGGLE_API}/kernels/output",
+                params={"userName": KAGGLE_OWNER, "kernelSlug": KAGGLE_SLUG},
+            )
+            r.raise_for_status()
+            data = r.json()
+
+        files = data.get("files") or []
+        mp4_entry = next(
+            (f for f in files if (f.get("fileName") or "").endswith("_final.mp4")),
+            None,
         )
-    return extract_dir
+
+        if mp4_entry is None:
+            last_error = (
+                f"Lần {attempt}: chưa thấy file *_final.mp4 trong output "
+                f"({len(files)} file có sẵn: {[f.get('fileName') for f in files][:10]})"
+            )
+            await asyncio.sleep(retry_delay)
+            continue
+
+        file_name = Path(mp4_entry["fileName"]).name
+        file_url = mp4_entry["url"]
+
+        async with httpx.AsyncClient(timeout=300) as client:
+            fr = await client.get(file_url)
+            fr.raise_for_status()
+
+        mp4_path = extract_dir / file_name
+        mp4_path.write_bytes(fr.content)
+        return extract_dir
+
+    raise RuntimeError(f"Tải output Kaggle thất bại sau {retries} lần thử. Lỗi cuối: {last_error}")
 
 
 async def wait_until_complete(callback=None) -> str:

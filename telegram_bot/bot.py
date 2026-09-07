@@ -3,7 +3,7 @@
 Chạy:
     python -m telegram_bot.bot
 
-Luồng: 2 ảnh (A/B) → tên A → tên B → giới thiệu A → giới thiệu B → chọn giọng
+Luồng: 2 ảnh (A/B) → tên A → tên B → gợi ý A → gợi ý B → chọn giọng
 → bot push notebook lên Kaggle (GPU + vieneu), poll, tải mp4, gửi cho user.
 """
 import asyncio
@@ -68,8 +68,8 @@ async def cmd_start(message: Message, state: FSMContext):
     await state.clear()
     await state.set_state(Job.photo_a)
     await message.answer(
-        "Chào bạn! Bot sẽ tự sinh video so sánh A/B trên Kaggle.\n\n"
-        "1️⃣ Gửi ảnh sản phẩm <b>A</b> <i>(ảnh đầu tiên)</i>"
+        "Chào bạn! Bot sẽ tự sinh video so sánh hai nhân vật / vụ án trên Kaggle.\n\n"
+        "1️⃣ Gửi ảnh nhân vật <b>A</b> <i>(ảnh đầu tiên)</i>"
     )
 
 
@@ -85,55 +85,61 @@ async def cmd_cancel(message: Message, state: FSMContext):
 async def on_photo_a(message: Message, state: FSMContext):
     await state.update_data(photo_a=message.photo[-1].file_id)
     await state.set_state(Job.photo_b)
-    await message.answer("✅ Ảnh A xong. 2️⃣ Bây giờ gửi ảnh sản phẩm <b>B</b>.")
+    await message.answer("✅ Ảnh A xong. 2️⃣ Bây giờ gửi ảnh nhân vật <b>B</b>.")
 
 
 @router.message(Job.photo_a)
 async def on_photo_a_bad(message: Message):
-    await message.answer("Gửi <b>ảnh</b> sản phẩm A nhé (dạng ảnh, không phải file).")
+    await message.answer("Gửi <b>ảnh</b> nhân vật A nhé (dạng ảnh, không phải file).")
 
 
 @router.message(Job.photo_b, F.photo)
 async def on_photo_b(message: Message, state: FSMContext):
     await state.update_data(photo_b=message.photo[-1].file_id)
     await state.set_state(Job.name_a)
-    await message.answer("✅ Ảnh B xong. 3️⃣ Nhập <b>tên sản phẩm A</b> (vd: SH 350)")
+    await message.answer("✅ Ảnh B xong. 3️⃣ Nhập <b>tên nhân vật A</b> (vd: Nguyễn Văn A)")
 
 
 @router.message(Job.photo_b)
 async def on_photo_b_bad(message: Message):
-    await message.answer("Gửi <b>ảnh</b> sản phẩm B nhé.")
+    await message.answer("Gửi <b>ảnh</b> nhân vật B nhé.")
 
 
 @router.message(Job.name_a)
 async def on_name_a(message: Message, state: FSMContext):
     await state.update_data(name_a=message.text.strip())
     await state.set_state(Job.name_b)
-    await message.answer("✅ Tên A: xong. 4️⃣ Nhập <b>tên sản phẩm B</b> (vd: PG-1)")
+    await message.answer("✅ Tên A: xong. 4️⃣ Nhập <b>tên nhân vật B</b> (vd: Trần Văn B)")
 
 
 @router.message(Job.name_b)
 async def on_name_b(message: Message, state: FSMContext):
     await state.update_data(name_b=message.text.strip())
     await state.set_state(Job.intro_a)
-    await message.answer("✅ Tên B: xong. 5️⃣ Nhập <b>giới thiệu vật A</b> (1–2 câu ngắn).\n"
-                         "Ví dụ: xe ga tay lái cao, 150cc, xịn nhưng giá chát.")
+    await message.answer("✅ Tên B: xong. 5️⃣ Nhập <b>gợi ý về nhân vật A</b> "
+                         "(để AI tìm hiểu về vụ việc, hành vi...).\n"
+                         "Ví dụ: trộm cắp tài sản, lừa đảo chiếm đoạt.\n"
+                         "Gõ <code>-</code> nếu không có gợi ý (AI tự tìm hiểu).")
 
 
 @router.message(Job.intro_a)
 async def on_intro_a(message: Message, state: FSMContext):
-    await state.update_data(intro_a=message.text.strip())
+    intro = "" if message.text.strip() == "-" else message.text.strip()
+    await state.update_data(intro_a=intro)
     await state.set_state(Job.intro_b)
-    await message.answer("✅ Giới thiệu A: xong. 6️⃣ Nhập <b>giới thiệu vật B</b> (1–2 câu ngắn).")
+    await message.answer("✅ Gợi ý A: xong. 6️⃣ Nhập <b>gợi ý về nhân vật B</b> "
+                         "(để AI tìm hiểu về vụ việc, hành vi...).\n"
+                         "Gõ <code>-</code> nếu không có gợi ý.")
 
 
 @router.message(Job.intro_b)
 async def on_intro_b(message: Message, state: FSMContext):
-    await state.update_data(intro_b=message.text.strip())
+    intro = "" if message.text.strip() == "-" else message.text.strip()
+    await state.update_data(intro_b=intro)
     await state.set_state(Job.note)
     await message.answer(
-        "✅ Giới thiệu B xong. 7️⃣ (Tuỳ chọn) Nhập <b>chú ý/lưu ý</b> cho AI nội dung.\n"
-        "Vd: nhấn mạnh giá, chê bai hàng nhái, thêm châm biếm về thương hiệu...\n"
+        "✅ Gợi ý B xong. 7️⃣ (Tuỳ chọn) Nhập <b>chú ý/lưu ý</b> cho AI nội dung.\n"
+        "Vd: nhấn mạnh mức án, so sánh tình tiết giảm nhẹ, nêu bài học pháp lý...\n"
         "Gõ <code>-</code> nếu không cần.")
 
 
@@ -143,7 +149,7 @@ async def on_note(message: Message, state: FSMContext):
     await state.update_data(note=note)
     await state.set_state(Job.product_name)
     await message.answer(
-        "✅ Chú ý xong. Nhập <b>tên sản phẩm</b> bạn muốn giới thiệu ở cuối video "
+        "✅ Lưu ý xong. Nhập <b>tên sản phẩm</b> muốn giới thiệu ở cuối video "
         "(sách, khoá học, app... hoặc gõ <code>-</code> nếu không cần)."
     )
 
